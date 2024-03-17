@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Dashboard</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .card {
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin: 10px;
+            padding: 20px;
+            width: 250px;
+            box-sizing: border-box;
+        }
+        .card h2 {
+            color: #333;
+            font-size: 20px;
+            margin-top: 0;
+        }
+        .card p {
+            color: #666;
+            margin: 10px 0;
+        }
+        .card input,
+        .card select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .icon {
+            height: 40px;
+            margin-bottom: 10px;
+        }
+        .bulb {
+            fill: #ffd700;
+            transition: fill 0.3s ease;
+        }
+        .bulb-off {
+            fill: #9e9e9e;
+        }
+        .glow {
+            filter: url(#glow-effect);
+        }
+    </style>
+</head>
+<body>
+    <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+        <filter id="glow-effect" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </svg>
+    <div class="card">
+        <img src="Fan.png" alt="Fan" class="icon">
+        <h2>Fan</h2>
+        <p>Control the speed of the fan</p>
+        <input type="range" min="0" max="5" value="0">
+    </div>
+    <div class="card">
+        <svg id="bulbIcon" viewBox="0 0 24 24" width="50" height="50">
+            <path class="bulb bulb-off"
+                d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h8c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7zm-4 7c0-2.21 1.79-4 4-4s4 1.79 4 4h-8z" />
+        </svg>
+        <h2>Bulb</h2>
+        <p>Turn on or off the bulb</p>
+        <select id="bulbState" onchange="toggleBulb()">
+            <option value="off">Off</option>
+            <option value="on">On</option>
+        </select>
+    </div>
+    <div class="card">
+        <img src="LED.png" alt="Led" class="icon">
+        <h2>Led</h2>
+        <p>Control the color of the led</p>
+        <input type="color" value="#ff0000">
+    </div>
+    <div class="card">
+        <img src="AC.png" alt="Air conditioner" class="icon">
+        <h2>Air conditioner</h2>
+        <p>Control state & temp of AC</p>
+        <select>
+            <option value="off">Off</option>
+            <option value="on">On</option>
+        </select>
+        <input type="number" value="23">
+    </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        fetch('https://kodessphere-api.vercel.app/devices/f3HYHGl')
+          .then(response => response.json())
+          .then(data => {
+            document.querySelector('input[type="range"]').value = data.fan;
+            document.getElementById('bulbState').value = data.bulb ? 'on' : 'off';
+            document.querySelector('input[type="color"]').value = data.led;
+            document.querySelectorAll('.card')[3].querySelector('select').value = data.ac.state ? 'on' : 'off';
+            document.querySelectorAll('.card')[3].querySelector('input[type="number"]').value = data.ac.temp;
+            toggleBulb();
+          })
+          .catch(error => {
+            console.error('Error fetching initial data:', error);
+          });
+      });
+      
+      function toggleBulb() {
+        const bulbIcon = document.getElementById('bulbIcon').querySelector('.bulb');
+        const bulbState = document.getElementById('bulbState').value;
+        bulbIcon.classList.toggle('glow', bulbState === 'on');
+        bulbIcon.classList.toggle('bulb-off', bulbState !== 'on');
+        updateDevice('bulb', bulbState === 'on' ? 1 : 0);
+      }
+      
+      function updateDevice(device, value) {
+        const data = {
+          teamid: "f3HYHGl",
+          device: device,
+          value: value
+        };
+        fetch('https://kodessphere-api.vercel.app/devices', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => console.log('Success:', data))
+        .catch(error => console.error('Error:', error));
+      }
+      document.querySelector('input[type="range"]').addEventListener('input', function() {
+        updateDevice('fan', parseInt(this.value));
+      });
+      
+      document.getElementById('bulbState').addEventListener('change', toggleBulb);
+      
+      document.querySelector('input[type="color"]').addEventListener('input', function() {
+        updateDevice('led', this.value);
+      });
+      
+      const acTempInput = document.querySelectorAll('.card')[3].querySelector('input[type="number"]');
+      const acStateSelect = document.querySelectorAll('.card')[3].querySelector('select');
+      
+      function updateAC() {
+        const acData = {
+          temp: parseInt(acTempInput.value),
+          state: acStateSelect.value === 'on' ? 1 : 0
+        };
+        updateDevice('ac', acData);
+      }
+      
+      acStateSelect.addEventListener('change', updateAC);
+      acTempInput.addEventListener('input', updateAC);
+    </script>
+</html>
